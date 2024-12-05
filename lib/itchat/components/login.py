@@ -326,7 +326,7 @@ def start_receiving(self, exitCallback=None, getReceivingFnOnly=False):
                         retryCount) + "Stop trying...")
                     self.alive = False
                 else:
-                    time.sleep(1)
+                    time.sleep(max(1.0, random.random() * 5))
         self.logout()
         if hasattr(exitCallback, '__call__'):
             exitCallback()
