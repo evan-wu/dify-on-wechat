@@ -1,5 +1,6 @@
 import logging
 import sys
+import os
 
 
 def _reset_logger(log):
@@ -30,7 +31,7 @@ def _reset_logger(log):
 def _get_logger():
     log = logging.getLogger("log")
     _reset_logger(log)
-    log.setLevel(logging.INFO)
+    log.setLevel(logging.DEBUG if os.environ.get('LOG_LEVEL') == 'DEBUG' else logging.INFO)
     return log
 
 
