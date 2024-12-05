@@ -29,7 +29,8 @@ def start_channel(channel_name: str):
     channel = channel_factory.create_channel(channel_name)
     if channel_name in ["wx", "wxy", "terminal", "wechatmp", "wechatmp_service", "wechatcom_app", "wework",
                         "wechatcom_service", "gewechat", const.FEISHU, const.DINGTALK]:
-        PluginManager().load_plugins()
+        # PluginManager().load_plugins()
+        pass
 
     if conf().get("use_linkai"):
         try:
