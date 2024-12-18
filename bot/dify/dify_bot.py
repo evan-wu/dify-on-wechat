@@ -26,43 +26,51 @@ class DifyBot(Bot):
         self.sessions = DifySessionManager(DifySession, model=conf().get("model", const.DIFY))
 
     def reply(self, query, context: Context=None):
+        logger.info("[DIFY] query={}".format(query))
+        session_id = context["session_id"]
+        # TODO: 适配除微信以外的其他channel
+        channel_type = conf().get("channel_type", "wx")
+        user = None
+        if channel_type in ["wx", "wework", "gewechat"]:
+            user = context["msg"].other_user_nickname if context.get("msg") else "default"
+        elif channel_type in ["wechatcom_app", "wechatmp", "wechatmp_service", "wechatcom_service", "web"]:
+            user = context["msg"].other_user_id if context.get("msg") else "default"
+        else:
+            return Reply(ReplyType.ERROR,
+                         f"unsupported channel type: {channel_type}, now dify only support wx, wechatcom_app, wechatmp, wechatmp_service channel")
+        logger.debug(f"[DIFY] dify_user={user}")
+        user = user if user else "default"  # 防止用户名为None，当被邀请进的群未设置群名称时用户名为None
+        session = self.sessions.get_session(session_id, user)
+        if context.get("isgroup", False):
+            # 群聊：根据是否是共享会话群来决定是否设置用户信息
+            if not context.get("is_shared_session_group", False):
+                # 非共享会话群：设置发送者信息
+                session.set_user_info(context["msg"].actual_user_id, context["msg"].actual_user_nickname)
+            else:
+                # 共享会话群：不设置用户信息
+                session.set_user_info('', '')
+            # 设置群聊信息
+            session.set_room_info(context["msg"].other_user_id, context["msg"].other_user_nickname)
+        else:
+            # 私聊：使用发送者信息作为用户信息，房间信息留空
+            session.set_user_info(context["msg"].other_user_id, context["msg"].other_user_nickname)
+            session.set_room_info('', '')
+
+        # 打印设置的session信息
+        logger.debug(
+            f"[DIFY] Session user and room info - user_id: {session.get_user_id()}, user_name: {session.get_user_name()}, room_id: {session.get_room_id()}, room_name: {session.get_room_name()}")
+        logger.debug(f"[DIFY] session={session} query={query}")
+
         # acquire reply content
         if context.type == ContextType.TEXT or context.type == ContextType.IMAGE_CREATE:
             if context.type == ContextType.IMAGE_CREATE:
                 query = conf().get('image_create_prefix', ['画'])[0] + query
-            logger.info("[DIFY] query={}".format(query))
-            session_id = context["session_id"]
-            # TODO: 适配除微信以外的其他channel
-            channel_type = conf().get("channel_type", "wx")
-            user = None
-            if channel_type in ["wx", "wework", "gewechat"]:
-                user = context["msg"].other_user_nickname if context.get("msg") else "default"
-            elif channel_type in ["wechatcom_app", "wechatmp", "wechatmp_service", "wechatcom_service", "web"]:
-                user = context["msg"].other_user_id if context.get("msg") else "default"
-            else:
-                return Reply(ReplyType.ERROR, f"unsupported channel type: {channel_type}, now dify only support wx, wechatcom_app, wechatmp, wechatmp_service channel")
-            logger.debug(f"[DIFY] dify_user={user}")
-            user = user if user else "default" # 防止用户名为None，当被邀请进的群未设置群名称时用户名为None
-            session = self.sessions.get_session(session_id, user)
-            if context.get("isgroup", False):
-                # 群聊：根据是否是共享会话群来决定是否设置用户信息
-                if not context.get("is_shared_session_group", False):
-                    # 非共享会话群：设置发送者信息
-                    session.set_user_info(context["msg"].actual_user_id, context["msg"].actual_user_nickname)
-                else:
-                    # 共享会话群：不设置用户信息
-                    session.set_user_info('', '')
-                # 设置群聊信息
-                session.set_room_info(context["msg"].other_user_id, context["msg"].other_user_nickname)
-            else:
-                # 私聊：使用发送者信息作为用户信息，房间信息留空
-                session.set_user_info(context["msg"].other_user_id, context["msg"].other_user_nickname)
-                session.set_room_info('', '')
-
-            # 打印设置的session信息
-            logger.debug(f"[DIFY] Session user and room info - user_id: {session.get_user_id()}, user_name: {session.get_user_name()}, room_id: {session.get_room_id()}, room_name: {session.get_room_name()}")
-            logger.debug(f"[DIFY] session={session} query={query}")
-
+            reply, err = self._reply(query, session, context)
+            if err != None:
+                error_msg = conf().get("error_reply", "我暂时遇到了一些问题，请您稍后重试~")
+                reply = Reply(ReplyType.TEXT, error_msg)
+            return reply
+        elif context.type == ContextType.IMAGE:
             reply, err = self._reply(query, session, context)
             if err != None:
                 error_msg = conf().get("error_reply", "我暂时遇到了一些问题，请您稍后重试~")
@@ -188,7 +196,7 @@ class DifyBot(Bot):
             if is_group:
                 at_prefix = "@" + context["msg"].actual_user_nickname + "\n"
                 content = at_prefix + content
-            final_reply = Reply(ReplyType.TEXT, final_item['content'])
+            final_reply = Reply(ReplyType.TEXT, content)
         elif final_item['type'] == 'image':
             image_url = self._fill_file_base_url(final_item['content'])
             image = self._download_image(image_url)
