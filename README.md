@@ -59,23 +59,33 @@ Dify接入微信生态的**详细教程**请查看文章 [**手摸手教你把 D
 
 # 交流群
 
+欢迎加入 **🤖大模型/知识库/bot交流群**，不仅能及时**获取本项目版本更新**公告，还可以一起**交流AI相关知识**！
 
 <div align="center">
 
-|<img width="240" src="./docs/images/wechat.jpg">|<img width="240" src="./docs/images/supportme.jpg">|
+|<img width="240" src="./docs/images/wechat_group_1.jpg">|<img width="240" src="./docs/images/wechat_group_2.jpg">|
 |:-:|:-:|
+|<img width="240" src="./docs/images/wechat.jpg">|<img width="240" src="./docs/images/supportme.jpg">|
 |添加我的微信拉你进交流群|开源不易，感谢打赏🎉|
 
 </div>
 
-
 # 最新功能
 
 ## 1. 支持gewechat登录微信
+
 基于[Gewechat](https://github.com/Devo919/Gewechat)项目实现的微信个人号通道,使用ipad协议登录,相比itchat协议更稳定。
 
 > 1. gewechat要求必须搭建服务到**同省服务器**或者电脑里方可正常使用
 > 2. 此项目仅用于个人娱乐场景，请勿用于任何商业场景
+>
+> ⚠️注意目前channel_type: "wx" 对应的 itchat无法使用，请更换为gewechat
+
+dify-on-wechat、dify、gewechat服务的调用关系
+
+<div align="center">
+<img width="700" src="./docs/gewechat/gewechat_service_design.png">
+</div>
 
 ### 快速启动gewechat机器人
 
@@ -88,7 +98,7 @@ docker tag registry.cn-chengdu.aliyuncs.com/tu1h/wechotd:alpine gewe
 
 # 创建数据目录并启动服务
 mkdir -p gewechat/data  
-docker run -itd -v gewechat/data:/root/temp -p 2531:2531 -p 2532:2532 --restart=always --name=gewe gewe
+docker run -itd -v ./gewechat/data:/root/temp -p 2531:2531 -p 2532:2532 --restart=always --name=gewe gewe
 ```
 
 #### 配置dify-on-wechat
@@ -105,6 +115,13 @@ gewechat相关配置如下，注意**channel_type设置为gewechat**
     "gewechat_download_url": "http://本机ip:2532/download" # 文件下载地址
 }
 ```
+
+> 本机ip是指**局域网ip**或**公网ip**，可通过`ipconfig`或`ifconfig`命令查看
+> 
+> 对与gewechat_callback_url，ip不能填`127.0.0.1`或`localhost`，否则会报错
+> 
+> `9919`端口是dify-on-wechat服务监听的端口，如果是用docker启动的dify-on-wechat服务,请把`9919`端口映射到宿主机
+
 **请务必查看详细配置**： [gewechat接入文档](./docs/gewechat/README.md)
 
 #### 启动机器人
@@ -117,6 +134,15 @@ python app.py
 <div align="center">
 <img width="700" src="./docs/gewechat/gewechat_login.jpg">
 </div>
+⚠️如果遇到gewechat创建设备失败，unexpected EOF错误，请排查网络是否是以下情况：
+
+1️⃣代理：请关闭代理后尝试；
+
+2️⃣国外服务器；
+
+3️⃣回调地址为外网；
+
+4️⃣异地服务器
 
 ## 2. 用户信息对接dify
 
@@ -241,15 +267,15 @@ dify官网已正式上线工作流模式，可以导入本项目下的[dsl文件
 ```bash
 # coze config.json文件内容示例
 {
-  "coze_api_base": "https://api.coze.cn/open_api/v2",  # coze base url
-  "coze_api_key": "xxx",                               # coze api key
-  "coze_bot_id": "xxx",                                # 根据url获取coze_bot_id https://www.coze.cn/space/{space_id}/bot/{bot_id}
-  "channel_type": "wx",                                # 通道类型，当前为个人微信
-  "model": "coze",                                     # 模型名称，当前对应coze平台
-  "single_chat_prefix": [""],                          # 私聊时文本需要包含该前缀才能触发机器人回复
-  "single_chat_reply_prefix": "",                      # 私聊时自动回复的前缀，用于区分真人
-  "group_chat_prefix": ["@bot"],                       # 群聊时包含该前缀则会触发机器人回复
-  "group_name_white_list": ["ALL_GROUP"]               # 机器人回复的群名称列表
+  "coze_api_base": "https://api.coze.cn",     # coze base url
+  "coze_api_key": "xxx",                      # coze api key
+  "coze_bot_id": "xxx",                       # 根据url获取coze_bot_id https://www.coze.cn/space/{space_id}/bot/{bot_id}
+  "channel_type": "gewechat",                 # 通道类型，当前为个人微信
+  "model": "coze",                            # 模型名称，当前对应coze平台
+  "single_chat_prefix": [""],                 # 私聊时文本需要包含该前缀才能触发机器人回复
+  "single_chat_reply_prefix": "",             # 私聊时自动回复的前缀，用于区分真人
+  "group_chat_prefix": ["@bot"],              # 群聊时包含该前缀则会触发机器人回复
+  "group_name_white_list": ["ALL_GROUP"]      # 机器人回复的群名称列表
 }
 ```
 
@@ -282,7 +308,33 @@ dify语音相关配置如下，另外需要在dify应用中开启语音转文字
 }
 ```
 
+> ⚠️注意：dify应用中开启语音转文字以及文字转语音功能，不是在工具中添加Audio（tts/asr），以0.15.1版本为例，**具体路径是：你的dify应用-编排-调试与预览-开启功能增强 webapp 用户体验（底部）-开启语音转文字-开启文字转语音-发布后生效**。老版本dify与新版不同，不在调试与预览中，而是左边编排工具下面。详细开启方法可查看issue [#211](https://github.com/hanfangyuan4396/dify-on-wechat/issues/211)
+
+搭配 gewechat_channel 可以实现发送语音条功能，gewechat服务只能获取到**20s**以内的语音，所以**你只能给bot发送20s以内的语音**，但**bot给你发送语音时无此限制**。[**请查看gewechat接入文档**](./docs/gewechat/README.md)
+
+<div align="center">
+<img width="700" src="./docs/gewechat/gewechat_voice.jpg">
+</div>
+
+
+## 9. 支持dify图片识别
+
+dify图片识别配置如下，另外需要在dify应用中开启图片上传与图片理解功能。使用方法为，**先发送图片**，然后**在3分钟内发送关于图片的问题**，注意先后顺序。
+
+```bash
+{
+  "dify_api_base": "https://api.dify.ai/v1",
+  "dify_api_key": "app-xxx",
+  "dify_app_type": "chatbot",
+  "image_recognition": true
+}
+```
+
 # 更新日志
+- 2025/01/06 修复在微信群中微信账号无法识别命令的bug，感谢[**sofs2005**](https://github.com/sofs2005)贡献的代码
+- 2025/01/04 修复gewechat自动回复公众号等官方账号消息的bug，感谢[**benxiaohai86**](https://github.com/benxiaohai86)提供的过滤思路
+- 2024/12/29 支持gewechat发送语音条消息
+- 2024/12/28 支持gewechat总结分享的公众号文章与图片识别
 - 2024/12/14 支持用户信息对接dify
 - 2024/12/04 新增 [gewechat](https://github.com/Devo919/Gewechat) 通道，相比itchat更稳定。
 - 2024/10/01 新增插件CustomDifyApp与GroupAtAutoreply，CustomDifyApp支持根据群聊名称关键词自动切换不同的Dify应用，GroupAtAutoreply支持群聊艾特自动回复，贡献者[**blankbro**](https://github.com/blankbro)
@@ -401,6 +453,8 @@ nohup python3 app.py & tail -f nohup.out          # 在后台运行程序并通�
 
 ### 3.Docker部署
 
+⚠️使用`docker`或者`docker-compose`部署时，**必须先拉取最新源码**，否则会报错⚠️
+
 ```bash
 cd dify-on-wechat/docker       # 进入docker目录
 cp ../config-template.json ../config.json
@@ -413,11 +467,7 @@ docker logs -f dify-on-wechat  # 查看二维码并登录
   <img src="https://contrib.rocks/image?repo=hanfangyuan4396/dify-on-wechat" />
 </a>
 
-# 开发计划
-- [ ] **Notice插件**: 识别到特定消息，通知指定好友，详情请查看[#18](https://github.com/hanfangyuan4396/dify-on-wechat/issues/18)。为了鼓励各位多参与此项目，在pr中留下联系方式，我会点咖啡或奶茶表示感谢，一点心意~
-- [ ] **测试合并原项目PR：** 原项目有很多比较好的PR没有通过，之后会把一些比较好的feature测试合并进这个仓库
-- [ ] **优化对接Dify：** 目前对接dify的很多代码写的还很潦草，以后逐步优化
-- [ ] **支持：** 企业微信个人号 
+
 
 也请各位大佬多多提PR，我社畜打工人，精力实在有限~
 
